@@ -80,13 +80,16 @@ func main() {
 
 		log.Println("Usage: ", humanize.Bytes(total))
 	} else if cmdDownload {
-		err := download(minioClient, bucketName, bucketPrefix, destinationPath)
+		info, err := download(minioClient, bucketName, bucketPrefix, destinationPath)
 		if err != nil {
 			log.Fatalln(err)
 			return
 		}
 
-		log.Println("Download complete")
+		log.Printf(
+			"\nDownload complete. %s [Count:%d, Skipped:%d, Error:%d]\n",
+			humanize.Bytes(info.Size), info.Count, info.Skipped, info.Skipped,
+		)
 	}
 }
 
@@ -190,7 +193,14 @@ func getUsage(client *minio.Client, bucketName, prefix string) (uint64, error) {
 	return total, err
 }
 
-func download(client *minio.Client, bucketName, prefix, destination string) error {
+type dlSummary struct {
+	Size    uint64
+	Count   uint64
+	Errs    uint64
+	Skipped uint64
+}
+
+func download(client *minio.Client, bucketName, prefix, destination string) (dlSummary, error) {
 	var err error
 
 	// Create a done channel to control 'ListObjectsV2' go routine.
@@ -200,31 +210,39 @@ func download(client *minio.Client, bucketName, prefix, destination string) erro
 	defer close(doneCh)
 
 	isRecursive := true
+	info := dlSummary{}
 	objectCh := client.ListObjectsV2(bucketName, prefix, isRecursive, doneCh)
 	for object := range objectCh {
+		info.Count++
+
 		if object.Err != nil {
 			log.Println(object.Err)
-			return err
+			info.Errs++
+			continue
 		}
 
 		log.Println(object.Key, " - ", humanize.Bytes(uint64(object.Size)))
 		if object.Size == 0 {
+			info.Skipped++
 			continue
 		}
 
 		path := objToFileName(object.Key, prefix, destination)
 		if fileExists(path) {
 			log.Println("file exists: ", path)
+			info.Skipped++
 			continue
 		}
 
 		if err := getObject(client, bucketName, object.Key, path); err != nil {
 			log.Println(object.Key, " Error: ", err)
+			info.Errs++
 			continue
 		}
+		info.Size += uint64(object.Size)
 	}
 
-	return err
+	return info, err
 }
 
 func objToFileName(path, prefix, folder string) string {
