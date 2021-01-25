@@ -125,7 +125,7 @@ func listDirectories(client *minio.Client, bucketName, prefix string, isRecursiv
 			log.Println(object.Err)
 			return err
 		}
-		log.Println(object.Key, " - ", humanize.Bytes(uint64(object.Size)))
+		log.Println(object.LastModified, object.Key, " - ", humanize.Bytes(uint64(object.Size)))
 	}
 
 	return err

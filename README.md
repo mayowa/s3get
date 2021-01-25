@@ -12,4 +12,4 @@ A barebones tool to download/interact with S3 API compatible Object Stores
 
 - resume download
 - get (download a single item)
-- refresh (download only if source item is new the destination)
+- refresh (download only if source item is new or newer than the destination)
